@@ -19,12 +19,14 @@ def PartialQR(A, k):
 
 
 def RRQR(A, delta):
+    m, n = A.shape
     maxrank = np.min(A.shape) ## A can have at most rank min(n,m)
     Qf = np.eye(m)
     P = np.eye(n) # Initialize Permutation P = I
     k = 0
     R = A.copy()
     norms = np.linalg.norm(R, axis=0)
+
     while np.max(norms) > delta and k != maxrank - 1:
         maxcol = np.where(norms == np.max(norms))[0][0] + k
         x, y = P.copy()[:,k], R.copy()[:,k]
