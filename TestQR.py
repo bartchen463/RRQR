@@ -1,7 +1,7 @@
 import numpy as np
 
 def PartialQR(A, k):
-    R22 = A.copy()[k:,k:] ## Extract un-triagularized block R22
+    R22 = A[k:,k:].copy() ## Extract un-triagularized block R22
     m, n = A.shape
     u = R22[:,0]
     d = u.shape[0]
@@ -20,6 +20,7 @@ def PartialQR(A, k):
 
 def RRQR(A, delta):
     m, n = A.shape
+    print(m, n)
     maxrank = np.min(A.shape) ## A can have at most rank min(n,m)
     Qf = np.eye(m)
     P = np.eye(n) # Initialize Permutation P = I
@@ -27,10 +28,11 @@ def RRQR(A, delta):
     R = A.copy()
     norms = np.linalg.norm(R, axis=0)
     epsilon = delta * np.sqrt(2) / (n+1)
+    print(delta, epsilon)
 
     while np.max(norms) > epsilon and k != maxrank - 1:
         maxcol = np.where(norms == np.max(norms))[0][0] + k
-        x, y = P.copy()[:,k], R.copy()[:,k]
+        x, y = P[:,k].copy(), R[:,k].copy()
         P[:,k], R[:,k] = P[:,maxcol], R[:,maxcol] ## Swap columns based on norm of cols in lower block Ck
         P[:,maxcol], R[:,maxcol] = x, y
         Qk, R = PartialQR(R, k)
@@ -42,7 +44,7 @@ def RRQR(A, delta):
             epsilon = np.sqrt(2) * delta / (n - k + 1)
     return P, Qf, R, k, epsilon
 
-A = np.random.uniform(low = -10, high = 10, size = (20,20))
+A = np.random.uniform(low = -10, high = 10, size = (20,20)) # test matrix
 for i in range(10):
     inds = np.random.choice(range(10), 4, replace = False)
     x = np.zeros(20)
@@ -50,22 +52,3 @@ for i in range(10):
         u = np.random.uniform(size = 20)
         x += np.random.randint(-5,5)*A[:,ind] + u/10
     A[:,i+10] = x
-
-
-P, Q, R, k, epsilon = RRQR(A, 0)
-
-P1, Q1, R1, k1, epsilon1 = RRQR(A, 0.5)
-
-np.linalg.norm(A@P1 - Q1@R1)
-
-
-AP = A@P
-AP1 = Q@R
-
-n = 79
-m = 60
-A = np.array([[np.random.randint(-6,19) for i in range(n)] for j in range(m)]).astype(float)
-P, Q, R = RRQR(A, 0.05)
-
-
-
