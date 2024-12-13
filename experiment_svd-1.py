@@ -2,7 +2,6 @@ from re import T
 from tkinter import S
 import numpy as np
 import matplotlib.pyplot as plt
-from TestQR import *
 
 # Goal: Show that if singular values decay rapidly, then RRQR gives near-optimal results 
 # TO DO: test the error of truncated SVD against that of RRQR for different matrices w unique singular value distrubitions
@@ -50,7 +49,7 @@ def compute_truncated_SVD(matrix, rank):
 
 
 def PartialQR(A, k):
-    R22 = A.copy()[k:,k:] ## Extract un-triagularized block R22
+    R22 = A[k:,k:].copy() ## Extract un-triagularized block R22
     m, n = A.shape
     u = R22[:,0]
     d = u.shape[0]
@@ -77,9 +76,9 @@ def RRQR2(A, delta, r):
     norms = np.linalg.norm(R, axis=0)
     epsilon = delta * np.sqrt(2) / (n+1)
 
-    while np.max(norms) > 1e-10 and k != r - 1:
+    while np.max(norms) > epsilon and k != r - 1:
         maxcol = np.where(norms == np.max(norms))[0][0] + k
-        x, y = P.copy()[:,k], R.copy()[:,k]
+        x, y = P[:,k].copy(), R[:,k].copy()
         P[:,k], R[:,k] = P[:,maxcol], R[:,maxcol] ## Swap columns based on norm of cols in lower block Ck
         P[:,maxcol], R[:,maxcol] = x, y
         Qk, R = PartialQR(R, k)
@@ -96,7 +95,7 @@ def compute_RRQR(matrix, rank):
     
     #rank = np.sum(np.abs(np.diag(R)) > delta)  # Numerical rank estimate
     # Truncated matrices for low-rank approximation
-    matrix_k = Q @ R @ P.T
+    matrix_k = Q[:,:k] @ R[:k,:] @ P.T
     return matrix_k
 
 def testing_SVD(n,m):   
@@ -106,14 +105,14 @@ def testing_SVD(n,m):
     norm_errors1 = []
     mat_1_k = create_matrix(n,m, np.array([ 1/s for s in np.arange(1,n+1)]))
      
-    for k in range(r):   
+    for k in range(1, r+1):
         mat_SVD1 = compute_truncated_SVD(mat_1_k, k)
         norm_errors1.append(np.linalg.norm(mat_1_k - mat_SVD1, ord ='fro')) 
         
     norm_errors2 = []
     mat_1_k2 = create_matrix(n,m, np.array([ 1/s**2 for s in np.arange(1,n+1)]))
      
-    for k in range(r):   
+    for k in range(1, r+1):
         mat_SVD2 = compute_truncated_SVD(mat_1_k2, k)
         norm_errors2.append(np.linalg.norm(mat_1_k2 - mat_SVD2, ord ='fro')) 
     
@@ -121,20 +120,26 @@ def testing_SVD(n,m):
     rank_e = np.array([ np.exp(-s*0.6)  for s in np.arange(1,n+1)])
     mat_e = create_matrix(n,m, rank_e)
     
-    for k in range(r):   
+    for k in range(1, r+1):
         mat_SVD3 = compute_truncated_SVD(mat_e, k)
         norm_errors3.append(np.linalg.norm(mat_e - mat_SVD3, ord ='fro')) 
 
     norm_errors4 = []
-    rank_rrqr = np.array([ 1/s**2  for s in np.arange(1,n+1)])
-    mat_rrqr = create_matrix(n,m, rank_rrqr)
-    
-    for k in range(r):   
-        mat_R = compute_RRQR(mat_rrqr, k)
-        norm_errors3.append(np.linalg.norm(mat_rrqr - mat_R, ord ='fro')) 
+    norm_errors5 = []
+    norm_errors6 = []
+    # rank_rrqr = np.array([ 1/s**2  for s in np.arange(1,n+1)])
+    # mat_rrqr = create_matrix(n,m, rank_rrqr)
+
+    for k in range(1, r+1):
+        mat_R = compute_RRQR(mat_1_k, k)
+        norm_errors4.append(np.linalg.norm(mat_1_k - mat_R, ord ='fro'))
+        mat_R = compute_RRQR(mat_1_k2, k)
+        norm_errors5.append(np.linalg.norm(mat_1_k2 - mat_R, ord ='fro'))
+        mat_R = compute_RRQR(mat_e, k)
+        norm_errors6.append(np.linalg.norm(mat_e - mat_R, ord='fro'))
         
         
-    rank_vals = range(r)
+    rank_vals = range(1, r+1)
     
    # print("rank_vals length", len(rank_vals))
     #print("norm_errors ", len(norm_errors1))
@@ -143,7 +148,9 @@ def testing_SVD(n,m):
     plt.plot(rank_vals, norm_errors1, label = "= 1/k", color = 'm')
     plt.plot(rank_vals, norm_errors2, label = "=1/k^2", color = 'b')
     plt.plot(rank_vals, norm_errors3, label = "=1/e^-nk", color = 'g')
-    plt.plot(rank_vals, norm_errors4, label = "rrrqr", color = 'y')
+    plt.plot(rank_vals, norm_errors4, label = "rrqr, 1/k", color = 'y')
+    plt.plot(rank_vals, norm_errors5, label="rrqr, 1/k^2", color='r')
+    plt.plot(rank_vals, norm_errors6, label="rrqr, e^-0.6k", color='y')
     
     plt.yscale('log')
     plt.xlabel('Rank')
@@ -152,59 +159,59 @@ def testing_SVD(n,m):
     plt.legend()
     plt.show() 
     
-    return 0
+    return
 
 
 testing_SVD(100,100)
     
     
-def comparison(n,m,top_rank):
-    mat = create_matrix(n,m)
-    print(mat)
-    
-    U, S, Vt = np.linalg.svd(mat)
-    #Find singular values of matrix
-    
-    errors_SVD = []
-    errors_RRQR = []
-
-    #e = np.arange(-6, -2, 10) 
-    
-    for e in epsilon:
-        
-        mat_RRQR, rank = compute_RRQR(mat, e)
-        err_RRQR = np.linalg.norm(mat - mat_RRQR, ord ='fro')
-        errors_RRQR.append(err_RRQR)
-        
-        #computes truncated SVD with the same rank as RRQR
-        mat_SVD = compute_truncated_SVD(mat, rank)
-        err_SVD = np.linalg.norm(mat - mat_SVD, ord ='fro')
-        errors_SVD.append(err_SVD)
-        
-        
-    return S, errors_SVD, errors_RRQR, ranks
-
-    
-    
-    
-def graphing_comparison(n,m, top_rank):
-    
-    singular_vals, errors_SVD, errors_RRQR, ranks = comparison(n,m,top_rank)
-    
-    plt.plot(ranks, errors_SVD, label = "Truncated SVD Error", color = 'm')
-    plt.plot(ranks, errors_RRQR, label = "RRQR Error", color = 'b')
-    
-    plt.yscale('log')
-    plt.xlabel('Rank')
-    plt.ylabel('Frobenius-Norm of Approximation Error')
-    plt.title("Comparison of Errors in Truncated SVD vs RRQR")
-    plt.legend()
-    plt.show()
-    
-    print("Singular values: ", singular_vals)
-
-#graphing_comparison(20,30,10)
-    
+# def comparison(n,m,top_rank):
+#     mat = create_matrix(n,m)
+#     print(mat)
+#
+#     U, S, Vt = np.linalg.svd(mat)
+#     #Find singular values of matrix
+#
+#     errors_SVD = []
+#     errors_RRQR = []
+#
+#     #e = np.arange(-6, -2, 10)
+#
+#     for e in epsilon:
+#
+#         mat_RRQR, rank = compute_RRQR(mat, e)
+#         err_RRQR = np.linalg.norm(mat - mat_RRQR, ord ='fro')
+#         errors_RRQR.append(err_RRQR)
+#
+#         #computes truncated SVD with the same rank as RRQR
+#         mat_SVD = compute_truncated_SVD(mat, rank)
+#         err_SVD = np.linalg.norm(mat - mat_SVD, ord ='fro')
+#         errors_SVD.append(err_SVD)
+#
+#
+#     return S, errors_SVD, errors_RRQR, ranks
+#
+#
+#
+#
+# def graphing_comparison(n,m, top_rank):
+#
+#     singular_vals, errors_SVD, errors_RRQR, ranks = comparison(n,m,top_rank)
+#
+#     plt.plot(ranks, errors_SVD, label = "Truncated SVD Error", color = 'm')
+#     plt.plot(ranks, errors_RRQR, label = "RRQR Error", color = 'b')
+#
+#     plt.yscale('log')
+#     plt.xlabel('Rank')
+#     plt.ylabel('Frobenius-Norm of Approximation Error')
+#     plt.title("Comparison of Errors in Truncated SVD vs RRQR")
+#     plt.legend()
+#     plt.show()
+#
+#     print("Singular values: ", singular_vals)
+#
+# #graphing_comparison(20,30,10)
+#
 
 
 
